@@ -171,14 +171,26 @@ main {
     flex: 1;
     padding: 20px;
     gap: 20px;
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
     width: 100%;
 }
 
 #sidebar {
-    width: 200px;
+    width: 140px;
     flex-shrink: 0;
+}
+
+#center-area {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#dice-area {
+    flex: none;
 }
 
 #sidebar h3 {
@@ -216,12 +228,12 @@ main {
 .dice-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 14px;
+    gap: 6px;
+    margin-bottom: 8px;
 }
 
 .dice-btn {
-    padding: 10px 18px;
+    padding: 8px 14px;
     border: 1px solid #c8b898;
     border-radius: 4px;
     background: #f5efe0;
@@ -286,8 +298,73 @@ main {
     transform: translateY(1px);
 }
 
+/* --- Grid de Mapa --- */
+#grid-area {
+    background: #f5efe0;
+    border: 1px solid #d0c0a8;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.grid-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+
+.grid-header h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a6a5a;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.grid-header input[type="file"] {
+    display: none;
+}
+
+#btn-load-grid {
+    padding: 6px 14px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #e8dcc8;
+    color: #5a4a3a;
+    font-size: 0.85rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#btn-load-grid:hover {
+    background: #dcccb4;
+    border-color: #b8a080;
+}
+
+#grid-container {
+    width: 100%;
+    overflow: auto;
+    border: 1px solid #d0c0a8;
+    border-radius: 4px;
+    background: #faf6ee;
+    position: relative;
+    min-height: 100px;
+}
+
+#grid-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
 #history {
-    margin-top: 20px;
+    margin-top: 0;
 }
 
 #history h3 {
@@ -302,7 +379,7 @@ main {
 }
 
 #roll-list {
-    max-height: 380px;
+    max-height: 200px;
     overflow-y: auto;
 }
 

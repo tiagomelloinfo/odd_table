@@ -23,3 +23,23 @@ class DiceRoll(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     player = db.relationship('Player', backref='rolls')
+
+
+class Pin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    player_name = db.Column(db.String(50), nullable=False)
+    npc_name = db.Column(db.String(50), nullable=True)
+    x = db.Column(db.Float, nullable=False)
+    y = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    player = db.relationship('Player', backref='pins')
+
+
+class MapImage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    data_url = db.Column(db.Text, nullable=False)
+    width = db.Column(db.Integer, nullable=False)
+    height = db.Column(db.Integer, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

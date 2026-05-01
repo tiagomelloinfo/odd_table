@@ -33,26 +33,39 @@
                 <ul id="online-list"></ul>
             </aside>
 
-            <section id="dice-area">
-                <div class="dice-buttons">
-                    <button class="dice-btn" data-dice="d4">d4</button>
-                    <button class="dice-btn" data-dice="d6">d6</button>
-                    <button class="dice-btn" data-dice="d8">d8</button>
-                    <button class="dice-btn" data-dice="d10">d10</button>
-                    <button class="dice-btn" data-dice="d12">d12</button>
-                    <button class="dice-btn" data-dice="d20">d20</button>
-                    <button class="dice-btn" data-dice="d100">d100</button>
-                </div>
-                <div class="roll-input">
-                    <input type="text" id="dice-formula" placeholder="d20 ou 2d6+3">
-                    <button id="btn-roll">🎲 Rolar!</button>
-                </div>
-            </section>
+            <div id="center-area">
+                <section id="dice-area">
+                    <div class="dice-buttons">
+                        <button class="dice-btn" data-dice="d4">d4</button>
+                        <button class="dice-btn" data-dice="d6">d6</button>
+                        <button class="dice-btn" data-dice="d8">d8</button>
+                        <button class="dice-btn" data-dice="d10">d10</button>
+                        <button class="dice-btn" data-dice="d12">d12</button>
+                        <button class="dice-btn" data-dice="d20">d20</button>
+                        <button class="dice-btn" data-dice="d100">d100</button>
+                    </div>
+                    <div class="roll-input">
+                        <input type="text" id="dice-formula" placeholder="d20 ou 2d6+3">
+                        <button id="btn-roll">🎲 Rolar!</button>
+                    </div>
+                </section>
 
-            <section id="history">
-                <h3>Histórico</h3>
-                <div id="roll-list"></div>
-            </section>
+                <section id="grid-area">
+                    <div class="grid-header">
+                        <h3>Grid de Mapa</h3>
+                        <input type="file" id="grid-image-input" accept="image/*">
+                        <button id="btn-load-grid" class="master-only" style="display:none;">Carregar Imagem</button>
+                    </div>
+                    <div id="grid-container">
+                        <canvas id="grid-canvas"></canvas>
+                    </div>
+                </section>
+
+                <section id="history">
+                    <h3>Histórico</h3>
+                    <div id="roll-list"></div>
+                </section>
+            </div>
         </main>
     </div>
 

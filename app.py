@@ -10,7 +10,7 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        from models import Player, DiceRoll  # noqa
+        from models import Player, DiceRoll, Pin, MapImage  # noqa
         db.create_all()
 
     from routes_auth import bp as auth_bp

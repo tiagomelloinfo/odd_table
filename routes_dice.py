@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, Response, stream_with_context
 from database import db
-from models import Player, DiceRoll
+from models import Player, DiceRoll, Pin, MapImage
 from sse_manager import sse_manager
 from auth import require_player
 
@@ -138,3 +138,136 @@ def ping(player):
     sse_manager.broadcast('online_update', {'online': online})
 
     return jsonify({'online': online})
+
+
+@bp.route('/pins', methods=['POST'])
+@require_player
+def set_pin(player):
+    """Define a posição do PIN.
+
+    - Jogadores comuns: 1 pin por jogador (remove o anterior)
+    - Mestre: múltiplos pins. Se npc_name já existir, move o pin existente.
+    """
+    data = request.get_json()
+    if not data or 'x' not in data or 'y' not in data:
+        return jsonify({'erro': 'Envie x e y'}), 400
+
+    x = float(data['x'])
+    y = float(data['y'])
+    npc_name = data.get('npc_name', '').strip() or None
+
+    if player.name == 'Mestre':
+        # Mestre: se npc_name já existir (em qualquer pin), move ele
+        if npc_name:
+            existing = Pin.query.filter_by(npc_name=npc_name).first()
+            if existing:
+                existing.x = x
+                existing.y = y
+                db.session.commit()
+                pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
+                sse_manager.broadcast('pins_update', {'pins': pins})
+                return jsonify({'pin': {'id': existing.id, 'player_name': existing.player_name, 'npc_name': existing.npc_name, 'x': existing.x, 'y': existing.y}})
+
+        # Novo pin
+        pin = Pin(player_id=player.id, player_name=player.name, npc_name=npc_name, x=x, y=y)
+        db.session.add(pin)
+    else:
+        # Jogador comum: 1 pin por jogador
+        Pin.query.filter_by(player_id=player.id).delete()
+        pin = Pin(player_id=player.id, player_name=player.name, npc_name=None, x=x, y=y)
+        db.session.add(pin)
+
+    db.session.commit()
+
+    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
+    sse_manager.broadcast('pins_update', {'pins': pins})
+
+    return jsonify({'pin': {'id': pin.id, 'player_name': pin.player_name, 'npc_name': pin.npc_name, 'x': pin.x, 'y': pin.y}})
+
+
+@bp.route('/pins', methods=['GET'])
+def get_pins():
+    """Retorna todos os pins ativos."""
+    pins = Pin.query.all()
+    return jsonify({
+        'pins': [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in pins]
+    })
+
+
+@bp.route('/pins/<int:pin_id>', methods=['DELETE'])
+@require_player
+def remove_pin_by_id(player, pin_id):
+    """Remove um PIN específico pelo ID. Só o Mestre ou o dono pode remover."""
+    pin = Pin.query.get(pin_id)
+    if not pin:
+        return jsonify({'erro': 'Pin não encontrado'}), 404
+
+    if player.name != 'Mestre' and pin.player_id != player.id:
+        return jsonify({'erro': 'Você não pode remover o pin de outro jogador'}), 403
+
+    db.session.delete(pin)
+    db.session.commit()
+
+    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
+    sse_manager.broadcast('pins_update', {'pins': pins})
+
+    return jsonify({'sucesso': True})
+
+
+@bp.route('/pins', methods=['DELETE'])
+@require_player
+def remove_own_pin(player):
+    """Remove o(s) PIN(s) do próprio jogador (jogador comum remove o seu único)."""
+    if player.name == 'Mestre':
+        return jsonify({'erro': 'Mestre deve remover pins individualmente pelo nome'}), 400
+
+    Pin.query.filter_by(player_id=player.id).delete()
+    db.session.commit()
+
+    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
+    sse_manager.broadcast('pins_update', {'pins': pins})
+
+    return jsonify({'sucesso': True})
+
+
+@bp.route('/map-image', methods=['POST'])
+@require_player
+def set_map_image(player):
+    """Só o Mestre pode carregar imagem do mapa."""
+    if player.name != 'Mestre':
+        return jsonify({'erro': 'Apenas o Mestre pode carregar a imagem do mapa'}), 403
+
+    data = request.get_json()
+    if not data or 'data_url' not in data:
+        return jsonify({'erro': 'Envie data_url'}), 400
+
+    # Substitui a imagem existente
+    MapImage.query.delete()
+    img = MapImage(
+        data_url=data['data_url'],
+        width=int(data.get('width', 0)),
+        height=int(data.get('height', 0)),
+    )
+    db.session.add(img)
+    db.session.commit()
+
+    sse_manager.broadcast('map_image_update', {
+        'data_url': img.data_url,
+        'width': img.width,
+        'height': img.height,
+    })
+
+    return jsonify({'sucesso': True})
+
+
+@bp.route('/map-image', methods=['GET'])
+def get_map_image():
+    """Retorna a imagem do mapa atual."""
+    img = MapImage.query.first()
+    if not img:
+        return jsonify({'data_url': None})
+    return jsonify({
+        'data_url': img.data_url,
+        'width': img.width,
+        'height': img.height,
+    })

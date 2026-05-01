@@ -107,6 +107,8 @@ function initGame() {
     loadHistory();
     connectSSE();
     startPing();
+    initGrid();
+    loadMapImage(); // carrega imagem do mapa se existir
 
     // Botões de dados
     document.querySelectorAll('.dice-btn').forEach((btn) => {
@@ -265,6 +267,18 @@ function connectSSE() {
         if (data.online) updateOnlineList(data.online);
     });
 
+    evtSource.addEventListener('pins_update', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.pins) drawPins(data.pins);
+    });
+
+    evtSource.addEventListener('map_image_update', (e) => {
+        const data = JSON.parse(e.data);
+        if (data.data_url && window.renderMapImage) {
+            window.renderMapImage(data.data_url);
+        }
+    });
+
     evtSource.onopen = () => {
         sseConnected = true;
     };
@@ -289,6 +303,275 @@ function startPing() {
             // ignora erro de ping
         }
     }, 30000);
+}
+function initGrid() {
+    const canvas = document.getElementById('grid-canvas');
+    const ctx = canvas.getContext('2d');
+    const btnLoad = document.getElementById('btn-load-grid');
+    const fileInput = document.getElementById('grid-image-input');
+
+    // Só mostra o botão se for o Mestre
+    if (playerName === 'Mestre') {
+        btnLoad.style.display = 'inline-block';
+    }
+
+    let imageData = null;
+
+    btnLoad.addEventListener('click', () => fileInput.click());
+
+    // Clique no canvas pra colocar PIN
+    canvas.addEventListener('click', async (e) => {
+        if (!imageData && !canvas._hasMapImage) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = Math.round((e.clientX - rect.left) * scaleX);
+        const y = Math.round((e.clientY - rect.top) * scaleY);
+
+        let npcName = null;
+
+        if (playerName === 'Mestre') {
+            npcName = prompt('Nome do NPC/Personagem neste local:', '');
+            if (npcName === null) return;
+            npcName = npcName.trim() || null;
+        }
+
+        try {
+            const body = { x, y };
+            if (npcName) body.npc_name = npcName;
+
+            const res = await fetch('/api/pins', {
+                method: 'POST',
+                headers: apiHeaders(),
+                body: JSON.stringify(body),
+            });
+            if (!res.ok && res.status === 401) {
+                localStorage.removeItem('dice_roller_api_key');
+                localStorage.removeItem('dice_roller_player_name');
+                location.reload();
+            }
+        } catch (err) {
+            console.error('Erro ao marcar posição:', err);
+        }
+    });
+
+    // Clique direito remove PIN
+    canvas.addEventListener('contextmenu', async (e) => {
+        e.preventDefault();
+        if (!canvas._pinsData) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clickX = (e.clientX - rect.left) * scaleX;
+        const clickY = (e.clientY - rect.top) * scaleY;
+
+        let closestPin = null;
+        let closestDist = 20;
+        for (const pin of canvas._pinsData) {
+            const dx = pin.x - clickX;
+            const dy = (pin.y - 10) - clickY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestPin = pin;
+            }
+        }
+
+        if (!closestPin) return;
+
+        if (playerName !== 'Mestre' && closestPin.player_name !== playerName) return;
+
+        const confirmMsg = closestPin.npc_name
+            ? `Remover pin "${closestPin.npc_name}"?`
+            : `Remover pin de ${closestPin.player_name}?`;
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await fetch(`/api/pins/${closestPin.id}`, {
+                method: 'DELETE',
+                headers: apiHeaders(),
+            });
+        } catch (err) {
+            console.error('Erro ao remover pin:', err);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const dataUrl = ev.target.result;
+            try {
+                const res = await fetch('/api/map-image', {
+                    method: 'POST',
+                    headers: apiHeaders(),
+                    body: JSON.stringify({ data_url: dataUrl, width: 0, height: 0 }),
+                });
+                if (!res.ok) {
+                    alert('Apenas o Mestre pode carregar imagens!');
+                    return;
+                }
+            } catch (err) {
+                console.error('Erro ao enviar imagem:', err);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Função pra renderizar imagem (chamada pelo SSE ou load)
+    window.renderMapImage = (dataUrl) => {
+        const img = new Image();
+        img.onload = () => {
+            const maxW = 800;
+            const scale = Math.min(1, maxW / img.width);
+            const w = Math.floor(img.width * scale);
+            const h = Math.floor(img.height * scale);
+
+            canvas.width = w;
+            canvas.height = h;
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+
+            // Fundo preto
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, w, h);
+
+            // Desenha a imagem
+            ctx.drawImage(img, 0, 0, w, h);
+
+            // Grid adaptável
+            drawGrid(ctx, w, h);
+
+            // Guarda referência
+            imageData = img;
+            canvas._imageData = img;
+            canvas._hasMapImage = true;
+            canvas._gridState = { scale: 1, offsetX: 0, offsetY: 0, baseW: w, baseH: h };
+
+            // Carrega pins
+            loadPins();
+        };
+        img.src = dataUrl;
+    };
+}
+
+async function loadMapImage() {
+    try {
+        const res = await fetch('/api/map-image');
+        const data = await res.json();
+        if (data.data_url && window.renderMapImage) {
+            window.renderMapImage(data.data_url);
+        }
+    } catch (err) {
+        console.error('Erro ao carregar imagem do mapa:', err);
+    }
+}
+
+async function loadPins() {
+    try {
+        const res = await fetch('/api/pins');
+        const data = await res.json();
+        drawPins(data.pins);
+    } catch (err) {
+        console.error('Erro ao carregar pins:', err);
+    }
+}
+
+function drawGrid(ctx, w, h) {
+    const cellSize = 20;
+    const cols = Math.ceil(w / cellSize);
+    const rows = Math.ceil(h / cellSize);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= cols; i++) {
+        const x = i * cellSize;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+    }
+
+    for (let i = 0; i <= rows; i++) {
+        const y = i * cellSize;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+    }
+}
+
+function drawPins(pins) {
+    const canvas = document.getElementById('grid-canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!canvas._imageData && !canvas._hasMapImage) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+
+    // Redesenha o fundo + imagem + grid
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, w, h);
+    if (canvas._imageData) {
+        ctx.drawImage(canvas._imageData, 0, 0, w, h);
+    }
+    drawGrid(ctx, w, h);
+
+    // Salva pins pro clique direito
+    canvas._pinsData = pins;
+
+    // Cores por jogador
+    const colors = ['#e94560', '#4ecdc4', '#f9ca24', '#6c5ce7', '#fd79a8', '#00b894', '#e17055', '#0984e3'];
+    let colorIndex = 0;
+    const playerColors = {};
+
+    pins.forEach((pin) => {
+        const px = pin.x;
+        const py = pin.y;
+
+        if (!playerColors[pin.player_name]) {
+            playerColors[pin.player_name] = colors[colorIndex % colors.length];
+            colorIndex++;
+        }
+        const color = playerColors[pin.player_name];
+        const label = pin.npc_name || pin.player_name;
+
+        // Círculo
+        ctx.beginPath();
+        ctx.arc(px, py - 10, 8, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Triângulo
+        ctx.beginPath();
+        ctx.moveTo(px - 6, py - 6);
+        ctx.lineTo(px + 6, py - 6);
+        ctx.lineTo(px, py + 4);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Nome
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 12px Segoe UI, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
+        ctx.fillText(label, px, py - 22);
+        ctx.shadowBlur = 0;
+    });
 }
 
 function logout() {

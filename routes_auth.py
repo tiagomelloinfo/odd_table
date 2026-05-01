@@ -11,7 +11,7 @@ def create_or_login():
     if not data:
         return jsonify({'erro': 'Corpo da requisição vazio'}), 400
 
-    name = data.get('name', '').strip()
+    name = data.get('name', '').strip().title()
     if len(name) < 2 or len(name) > 30:
         return jsonify({'erro': 'Nome deve ter entre 2 e 30 caracteres'}), 400
 
@@ -38,7 +38,7 @@ def login():
     if not data:
         return jsonify({'erro': 'Corpo da requisição vazio'}), 400
 
-    name = data.get('name', '').strip()
+    name = data.get('name', '').strip().title()
     player = Player.query.filter_by(name=name).first()
     if not player:
         return jsonify({'erro': 'Jogador não encontrado'}), 404
