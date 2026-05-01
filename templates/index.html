@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dice Roller - Old Dragon</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>🎲 Dice Roller</h1>
+            <p class="subtitle">Mesa de RPG Old Dragon</p>
+            <input type="text" id="player-name" placeholder="Nome do personagem" maxlength="30">
+            <button id="btn-enter">Entrar na Mesa</button>
+            <p id="login-error" class="error"></p>
+        </div>
+    </div>
+
+    <div id="game-screen" style="display:none;">
+        <header>
+            <h1>🎲 Dice Roller</h1>
+            <div class="header-right">
+                <span id="player-name-display"></span>
+                <span id="online-count">👥 0 online</span>
+                <button id="btn-logout">Sair</button>
+            </div>
+        </header>
+
+        <main>
+            <aside id="sidebar">
+                <h3>Jogadores Online</h3>
+                <ul id="online-list"></ul>
+            </aside>
+
+            <section id="dice-area">
+                <div class="dice-buttons">
+                    <button class="dice-btn" data-dice="d4">d4</button>
+                    <button class="dice-btn" data-dice="d6">d6</button>
+                    <button class="dice-btn" data-dice="d8">d8</button>
+                    <button class="dice-btn" data-dice="d10">d10</button>
+                    <button class="dice-btn" data-dice="d12">d12</button>
+                    <button class="dice-btn" data-dice="d20">d20</button>
+                    <button class="dice-btn" data-dice="d100">d100</button>
+                </div>
+                <div class="roll-input">
+                    <input type="text" id="dice-formula" placeholder="d20 ou 2d6+3">
+                    <button id="btn-roll">🎲 Rolar!</button>
+                </div>
+            </section>
+
+            <section id="history">
+                <h3>Histórico</h3>
+                <div id="roll-list"></div>
+            </section>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

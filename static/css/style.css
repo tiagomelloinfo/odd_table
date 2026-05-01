@@ -1,0 +1,455 @@
+/* ============================================
+   DICE ROLLER — Tema Papiro Desgastado
+   Fonte sem serifa, tons de papel envelhecido
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', 'Roboto', Arial, Helvetica, sans-serif;
+    background: #e8dcc8;
+    background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(160, 120, 60, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(120, 80, 40, 0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 50% 80%, rgba(180, 140, 80, 0.05) 0%, transparent 50%);
+    color: #3a2a1a;
+    min-height: 100vh;
+}
+
+h1, h2, h3 {
+    font-family: 'Segoe UI', 'Roboto', Arial, Helvetica, sans-serif;
+    font-weight: 600;
+    color: #3a2a1a;
+}
+
+/* --- Tela de login --- */
+#login-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.login-box {
+    background: #f5efe0;
+    background-image:
+        linear-gradient(135deg, #f5efe0 0%, #efe5d0 50%, #f0e8d4 100%);
+    border: 1px solid #c8b898;
+    border-radius: 6px;
+    padding: 48px 36px;
+    text-align: center;
+    max-width: 400px;
+    width: 90%;
+    box-shadow:
+        0 2px 12px rgba(60, 40, 20, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.login-box h1 {
+    font-size: 2rem;
+    margin-bottom: 6px;
+    font-weight: 700;
+}
+
+.login-box p.subtitle {
+    color: #7a6a5a;
+    margin-bottom: 28px;
+    font-size: 1rem;
+}
+
+.login-box input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #faf6ee;
+    color: #3a2a1a;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    margin-bottom: 16px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-box input:focus {
+    border-color: #8a7a6a;
+    box-shadow: 0 0 0 2px rgba(138, 122, 106, 0.15);
+}
+
+.login-box button {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #b8a080;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #d4c0a8 0%, #c0a888 100%);
+    color: #2a1a0a;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.login-box button:hover {
+    background: linear-gradient(180deg, #dcccbc 0%, #c8b498 100%);
+    box-shadow: 0 1px 4px rgba(60, 40, 20, 0.2);
+}
+
+.login-box button:active {
+    transform: translateY(1px);
+}
+
+.error {
+    color: #b84040;
+    font-size: 0.85rem;
+    margin-top: 8px;
+    min-height: 20px;
+}
+
+/* --- Tela do jogo --- */
+#game-screen {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    background: #f0e6d4;
+    border-bottom: 1px solid #d0c0a8;
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#player-name-display {
+    font-weight: 600;
+    color: #5a4a3a;
+    font-size: 0.95rem;
+}
+
+#online-count {
+    font-size: 0.9rem;
+    color: #7a6a5a;
+}
+
+#btn-logout {
+    padding: 6px 14px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #e8dcc8;
+    color: #5a4a3a;
+    font-size: 0.85rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#btn-logout:hover {
+    background: #dcccb4;
+    border-color: #b8a080;
+}
+
+main {
+    display: flex;
+    flex: 1;
+    padding: 20px;
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+#sidebar {
+    width: 200px;
+    flex-shrink: 0;
+}
+
+#sidebar h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #d0c0a8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a6a5a;
+}
+
+#online-list {
+    list-style: none;
+}
+
+#online-list li {
+    padding: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+}
+
+#online-list li::before {
+    content: '🟢';
+    font-size: 0.7rem;
+}
+
+#dice-area {
+    flex: 1;
+}
+
+.dice-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.dice-btn {
+    padding: 10px 18px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #f5efe0;
+    color: #3a2a1a;
+    font-size: 0.9rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.dice-btn:hover {
+    background: #ede0cc;
+    box-shadow: 0 1px 4px rgba(60, 40, 20, 0.12);
+}
+
+.dice-btn:active {
+    background: #e0d0b8;
+    transform: translateY(1px);
+}
+
+.roll-input {
+    display: flex;
+    gap: 8px;
+}
+
+.roll-input input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #faf6ee;
+    color: #3a2a1a;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    outline: none;
+}
+
+.roll-input input:focus {
+    border-color: #8a7a6a;
+    box-shadow: 0 0 0 2px rgba(138, 122, 106, 0.15);
+}
+
+#btn-roll {
+    padding: 10px 22px;
+    border: 1px solid #b09070;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #b89070 0%, #a08060 100%);
+    color: #fff;
+    font-size: 1rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#btn-roll:hover {
+    background: linear-gradient(180deg, #c8a080 0%, #b09070 100%);
+}
+
+#btn-roll:active {
+    transform: translateY(1px);
+}
+
+#history {
+    margin-top: 20px;
+}
+
+#history h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #d0c0a8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a6a5a;
+}
+
+#roll-list {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.roll-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #e0d4c4;
+    animation: fadeIn 0.2s;
+}
+
+.roll-item:hover {
+    background: #f0e8d8;
+}
+
+.roll-line-1 {
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+}
+
+.roll-line-2 {
+    font-size: 0.9rem;
+    margin-bottom: 2px;
+    color: #5a4a3a;
+}
+
+.roll-line-3 {
+    font-size: 0.95rem;
+}
+
+.roll-individual-die {
+    display: inline-block;
+    border: 1px solid #c8b898;
+    border-radius: 3px;
+    padding: 1px 7px;
+    margin-right: 3px;
+    font-weight: 600;
+    background: #faf6ee;
+    min-width: 28px;
+    text-align: center;
+}
+
+.roll-modifier {
+    color: #7a6a5a;
+    font-weight: 600;
+}
+
+.roll-player {
+    font-weight: 600;
+    color: #5a4a3a;
+}
+
+.roll-formula {
+    color: #8a7a6a;
+}
+
+.roll-total {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #8a6030;
+}
+
+/* --- Toast notifications --- */
+#toast-container {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.toast {
+    background: #f5efe0;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    padding: 10px 18px;
+    min-width: 240px;
+    box-shadow: 0 3px 10px rgba(60, 40, 20, 0.15);
+    animation: slideIn 0.25s ease-out;
+    font-size: 0.95rem;
+}
+
+.toast.fade-out {
+    animation: fadeOut 0.25s ease-out forwards;
+}
+
+.toast-player {
+    color: #5a4a3a;
+    font-weight: 600;
+}
+
+.toast-dice {
+    color: #8a6030;
+    font-weight: 600;
+}
+
+/* --- Animações --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(80px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; transform: translateX(80px); }
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #e8dcc8;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c8b898;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #b8a888;
+}
+
+/* --- Responsivo --- */
+@media (max-width: 768px) {
+    main {
+        flex-direction: column;
+    }
+
+    #sidebar {
+        width: 100%;
+    }
+
+    #online-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .login-box {
+        padding: 32px 24px;
+    }
+}
