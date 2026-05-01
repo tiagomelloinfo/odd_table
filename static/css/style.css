@@ -455,10 +455,62 @@ main {
     background: #f5efe0;
     border: 1px solid #c8b898;
     border-radius: 4px;
-    padding: 10px 18px;
+    padding: 10px 14px;
     min-width: 240px;
     box-shadow: 0 3px 10px rgba(60, 40, 20, 0.15);
     animation: slideIn 0.25s ease-out;
+    font-size: 0.95rem;
+}
+
+.toast-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.toast-title {
+    flex: 1;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: #8a7a6a;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+.toast-close:hover {
+    color: #5a4a3a;
+}
+
+.toast-dice-list {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.toast-die {
+    display: inline-block;
+    border: 1px solid #c8b898;
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-weight: 600;
+    background: #faf6ee;
+    min-width: 26px;
+    text-align: center;
+}
+
+.toast-mod {
+    font-weight: 600;
+    color: #7a6a5a;
+    margin-left: 4px;
+}
+
+.toast-result {
     font-size: 0.95rem;
 }
 

@@ -221,18 +221,47 @@ function parseModifier(formula) {
 
 function showRollToast(roll) {
     const container = document.getElementById('toast-container');
+
+    const individual = roll.individual || [];
+    const formula = roll.formula || '';
+    const mod = parseModifier(formula);
+
+    // Linha dos dados individuais
+    let diceHtml = '';
+    if (individual.length > 0) {
+        let line = '<div class="toast-dice-list">';
+        line += individual.map(v => `<span class="toast-die">${v}</span>`).join('');
+        if (mod) {
+            line += ` <span class="toast-mod">${mod > 0 ? '+' : ''}${mod}</span>`;
+        }
+        line += '</div>';
+        diceHtml = line;
+    }
+
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.innerHTML = `
-        🎲 <span class="toast-player">${escapeHtml(roll.player_name)}</span>
-        rolou <span class="toast-dice">${escapeHtml(roll.formula)}</span> → <strong>${roll.total}</strong>
+        <div class="toast-header">
+            <span class="toast-title">🎲 <span class="toast-player">${escapeHtml(roll.player_name)}</span>
+            rolou <span class="toast-dice-label">${escapeHtml(formula)}</span></span>
+            <button class="toast-close">&times;</button>
+        </div>
+        ${diceHtml}
+        <div class="toast-result">Total: <strong>${roll.total}</strong></div>
     `;
+
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.remove();
+    });
+
     container.appendChild(toast);
 
     setTimeout(() => {
-        toast.classList.add('fade-out');
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+        if (toast.parentNode) {
+            toast.classList.add('fade-out');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 20000);
 }
 
 function updateOnlineList(players) {
@@ -256,9 +285,7 @@ function connectSSE() {
         const data = JSON.parse(e.data);
         const roll = data.roll;
         addRollToHistory(roll);
-        if (roll.player_name !== playerName) {
-            showRollToast(roll);
-        }
+        showRollToast(roll);
         if (data.online) updateOnlineList(data.online);
     });
 
