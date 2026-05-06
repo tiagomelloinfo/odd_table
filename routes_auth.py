@@ -1,55 +1,61 @@
-from flask import Blueprint, request, jsonify
-from database import db
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from database import get_db
 from models import Player
+from auth import require_player
 
-bp = Blueprint('auth', __name__, url_prefix='/api')
+router = APIRouter(prefix='/api', tags=['auth'])
 
 
-@bp.route('/players', methods=['POST'])
-def create_or_login():
-    data = request.get_json()
-    if not data:
-        return jsonify({'erro': 'Corpo da requisição vazio'}), 400
+class PlayerCreate(BaseModel):
+    name: str
 
-    name = data.get('name', '').strip().title()
+
+@router.post('/players')
+def create_or_login(body: PlayerCreate, db: Session = Depends(get_db)):
+    name = body.name.strip().title()
     if len(name) < 2 or len(name) > 30:
-        return jsonify({'erro': 'Nome deve ter entre 2 e 30 caracteres'}), 400
+        raise HTTPException(status_code=400, detail='Nome deve ter entre 2 e 30 caracteres')
 
-    player = Player.query.filter_by(name=name).first()
+    player = db.query(Player).filter(Player.name == name).first()
     if not player:
         player = Player(name=name)
-        db.session.add(player)
+        db.add(player)
 
-    player.last_seen = __import__('datetime').datetime.utcnow()
-    db.session.commit()
+    player.last_seen = datetime.utcnow()
+    db.commit()
 
-    return jsonify({
+    return {
         'player': {
             'id': player.id,
             'name': player.name,
             'api_key': player.api_key,
         }
-    })
+    }
 
 
-@bp.route('/players/login', methods=['POST'])
-def login():
-    data = request.get_json()
-    if not data:
-        return jsonify({'erro': 'Corpo da requisição vazio'}), 400
+class PlayerLogin(BaseModel):
+    name: str
 
-    name = data.get('name', '').strip().title()
-    player = Player.query.filter_by(name=name).first()
+
+@router.post('/players/login')
+def login(body: PlayerLogin, db: Session = Depends(get_db)):
+    name = body.name.strip().title()
+    player = db.query(Player).filter(Player.name == name).first()
     if not player:
-        return jsonify({'erro': 'Jogador não encontrado'}), 404
+        raise HTTPException(status_code=404, detail='Jogador não encontrado')
 
-    player.last_seen = __import__('datetime').datetime.utcnow()
-    db.session.commit()
+    player.last_seen = datetime.utcnow()
+    db.commit()
 
-    return jsonify({
+    return {
         'player': {
             'id': player.id,
             'name': player.name,
             'api_key': player.api_key,
         }
-    })
+    }

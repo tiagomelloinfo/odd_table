@@ -210,8 +210,8 @@ function addRollToHistory(roll) {
     html += `<div class="roll-line-3">Resultado: <span class="roll-total">${roll.total}</span></div>`;
 
     item.innerHTML = html;
-    // Insere no topo (mais recente primeiro)
-    rollList.prepend(item);
+    // A API retorna do mais recente pro mais antigo, então append mantém a ordem
+    rollList.appendChild(item);
 }
 
 function parseModifier(formula) {
@@ -276,43 +276,44 @@ function updateOnlineList(players) {
     count.textContent = `👥 ${players.length} online`;
 }
 
+let pollingInterval = null;
+
 function connectSSE() {
-    if (sseConnected) return;
-    const evtSource = new EventSource('/api/stream');
-    window._evtSource = evtSource;
+    // Com Cloudflare Tunnel, SSE não funciona de forma confiável.
+    // Vamos direto pro polling, que é mais robusto.
+    startPolling();
+}
 
-    evtSource.addEventListener('new_roll', (e) => {
-        const data = JSON.parse(e.data);
-        const roll = data.roll;
-        addRollToHistory(roll);
-        showRollToast(roll);
-        if (data.online) updateOnlineList(data.online);
-    });
+function startPolling() {
+    if (pollingInterval) return;
+    let lastMaxId = 0;
+    pollingInterval = setInterval(async () => {
+        try {
+            const res = await fetch('/api/rolls', {
+                headers: { 'X-API-Key': playerApiKey },
+            });
+            const data = await res.json();
+            const rollList = document.getElementById('roll-list');
 
-    evtSource.addEventListener('online_update', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.online) updateOnlineList(data.online);
-    });
+            // Mostra toast pros rolls novos (maiores que lastMaxId)
+            if (lastMaxId > 0 && data.rolls.length > 0) {
+                const newest = data.rolls[0];
+                if (newest.id > lastMaxId) {
+                    showRollToast(newest);
+                }
+            }
+            if (data.rolls.length > 0) {
+                lastMaxId = data.rolls[0].id;
+            }
 
-    evtSource.addEventListener('pins_update', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.pins) drawPins(data.pins);
-    });
-
-    evtSource.addEventListener('map_image_update', (e) => {
-        const data = JSON.parse(e.data);
-        if (data.data_url && window.renderMapImage) {
-            window.renderMapImage(data.data_url);
+            rollList.innerHTML = '';
+            // A API já retorna do mais recente pro mais antigo (ORDER BY desc)
+            data.rolls.forEach(addRollToHistory);
+            updateOnlineList(data.online);
+        } catch (err) {
+            // ignora erro de polling
         }
-    });
-
-    evtSource.onopen = () => {
-        sseConnected = true;
-    };
-
-    evtSource.onerror = () => {
-        sseConnected = false;
-    };
+    }, 2000);
 }
 
 function startPing() {

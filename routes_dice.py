@@ -1,20 +1,40 @@
-import re
-import random
+import asyncio
 import json
-import uuid
+import random
+import re
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, Response, stream_with_context
-from database import db
+
+from fastapi import APIRouter, Depends, HTTPException, Header
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from starlette.responses import StreamingResponse
+
+from database import get_db
 from models import Player, DiceRoll, Pin, MapImage
-from sse_manager import sse_manager
 from auth import require_player
 
-bp = Blueprint('dice', __name__, url_prefix='/api')
+router = APIRouter(prefix='/api', tags=['dice'])
 
 DICE_PATTERN = re.compile(r'^(\d+)?d(\d+)([+-]\d+)?$')
 
+# SSE: fila global de eventos
+_sse_queues: list[asyncio.Queue] = []
 
-def parse_dice(formula):
+
+def _broadcast(event: str, data: dict):
+    """Envia evento SSE para todos os clientes conectados."""
+    payload = json.dumps({'event': event, 'data': data})
+    dead = []
+    for q in _sse_queues:
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            dead.append(q)
+    for q in dead:
+        _sse_queues.remove(q)
+
+
+def parse_dice(formula: str):
     """Parse fórmula de dados tipo 'd20', '2d6+3', '3d8-2'."""
     formula = formula.strip().lower()
     m = DICE_PATTERN.match(formula)
@@ -32,21 +52,26 @@ def parse_dice(formula):
     return {'qty': qty, 'sides': sides, 'modifier': modifier}
 
 
-def get_online_players():
+def get_online_players(db: Session):
     """Retorna lista de jogadores que deram ping nos últimos 60 segundos."""
     threshold = datetime.utcnow() - timedelta(seconds=60)
-    players = Player.query.filter(Player.last_seen >= threshold).all()
+    players = db.query(Player).filter(Player.last_seen >= threshold).all()
     return [{'id': p.id, 'name': p.name} for p in players]
 
 
-@bp.route('/roll', methods=['POST'])
-@require_player
-def roll_dice(player):
-    data = request.get_json()
-    formula = data.get('dice', 'd20') if data else 'd20'
-    parsed = parse_dice(formula)
+class RollBody(BaseModel):
+    dice: str = 'd20'
+
+
+@router.post('/roll')
+def roll_dice(
+    body: RollBody,
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
+    parsed = parse_dice(body.dice)
     if not parsed:
-        return jsonify({'erro': 'Fórmula inválida. Use algo como d20, 2d6+3'}), 400
+        raise HTTPException(status_code=400, detail='Fórmula inválida. Use algo como d20, 2d6+3')
 
     rolls = [random.randint(1, parsed['sides']) for _ in range(parsed['qty'])]
     total = sum(rolls) + parsed['modifier']
@@ -57,12 +82,12 @@ def roll_dice(player):
         player_name=player.name,
         dice_type=dice_type,
         result=rolls[0] if len(rolls) == 1 else sum(rolls),
-        formula=formula,
+        formula=body.dice,
         total=total,
         individual=rolls,
     )
-    db.session.add(roll)
-    db.session.commit()
+    db.add(roll)
+    db.commit()
 
     roll_dict = {
         'id': roll.id,
@@ -75,19 +100,23 @@ def roll_dice(player):
         'created_at': roll.created_at.isoformat(),
     }
 
-    online = get_online_players()
-    sse_manager.broadcast('new_roll', {'roll': roll_dict, 'online': online})
+    online = get_online_players(db)
+    _broadcast('new_roll', {'roll': roll_dict, 'online': online})
 
-    return jsonify({'roll': roll_dict})
+    return {'roll': roll_dict}
 
 
-@bp.route('/rolls', methods=['GET'])
-def list_rolls():
-    api_key = request.headers.get('X-API-Key')
-    player = Player.query.filter_by(api_key=api_key).first() if api_key else None
+@router.get('/rolls')
+def list_rolls(
+    x_api_key: str | None = Header(None, alias='X-API-Key'),
+    db: Session = Depends(get_db),
+):
+    player = None
+    if x_api_key:
+        player = db.query(Player).filter(Player.api_key == x_api_key).first()
 
-    rolls = DiceRoll.query.order_by(DiceRoll.created_at.desc()).limit(50).all()
-    return jsonify({
+    rolls = db.query(DiceRoll).order_by(DiceRoll.created_at.desc()).limit(50).all()
+    return {
         'rolls': [{
             'id': r.id,
             'player_name': r.player_name,
@@ -98,28 +127,32 @@ def list_rolls():
             'individual': r.individual,
             'created_at': r.created_at.isoformat(),
         } for r in rolls],
-        'online': get_online_players(),
+        'online': get_online_players(db),
         'current_player': player.name if player else None,
-    })
+    }
 
 
-@bp.route('/stream')
-def stream():
-    def event_stream():
-        q = sse_manager.subscribe()
+@router.get('/stream')
+async def event_stream():
+    """SSE endpoint nativo do FastAPI — sem bloqueio, sem threads."""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    _sse_queues.append(queue)
+
+    async def generate():
         try:
             yield f"event: connected\ndata: {json.dumps({'status': 'ok'})}\n\n"
             while True:
-                msg = q.get()
-                yield f"event: {msg['event']}\ndata: {json.dumps(msg['data'])}\n\n"
-        except GeneratorExit:
+                payload = await queue.get()
+                yield f"{payload}\n\n"
+        except asyncio.CancelledError:
             pass
         finally:
-            sse_manager.unsubscribe(q)
+            if queue in _sse_queues:
+                _sse_queues.remove(queue)
 
-    return Response(
-        stream_with_context(event_stream()),
-        mimetype='text/event-stream',
+    return StreamingResponse(
+        generate(),
+        media_type='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
@@ -128,146 +161,176 @@ def stream():
     )
 
 
-@bp.route('/ping', methods=['POST'])
-@require_player
-def ping(player):
+class PingBody(BaseModel):
+    pass
+
+
+@router.post('/ping')
+def ping(
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
     player.last_seen = datetime.utcnow()
-    db.session.commit()
+    db.commit()
 
-    online = get_online_players()
-    sse_manager.broadcast('online_update', {'online': online})
+    online = get_online_players(db)
+    _broadcast('online_update', {'online': online})
 
-    return jsonify({'online': online})
+    return {'online': online}  # ← mudado: retorna dict, não Response
 
 
-@bp.route('/pins', methods=['POST'])
-@require_player
-def set_pin(player):
+class PinBody(BaseModel):
+    x: float
+    y: float
+    npc_name: str | None = None
+
+
+class MapImageBody(BaseModel):
+    data_url: str
+    width: int = 0
+    height: int = 0
+
+
+def _serialize_pins(db: Session):
+    return [{
+        'id': p.id,
+        'player_name': p.player_name,
+        'npc_name': p.npc_name,
+        'x': p.x,
+        'y': p.y,
+    } for p in db.query(Pin).all()]
+
+
+@router.post('/pins')
+def set_pin(
+    body: PinBody,
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
     """Define a posição do PIN.
 
     - Jogadores comuns: 1 pin por jogador (remove o anterior)
     - Mestre: múltiplos pins. Se npc_name já existir, move o pin existente.
     """
-    data = request.get_json()
-    if not data or 'x' not in data or 'y' not in data:
-        return jsonify({'erro': 'Envie x e y'}), 400
-
-    x = float(data['x'])
-    y = float(data['y'])
-    npc_name = data.get('npc_name', '').strip() or None
+    x = body.x
+    y = body.y
+    npc_name = body.npc_name
 
     if player.name == 'Mestre':
-        # Mestre: se npc_name já existir (em qualquer pin), move ele
         if npc_name:
-            existing = Pin.query.filter_by(npc_name=npc_name).first()
+            existing = db.query(Pin).filter(Pin.npc_name == npc_name).first()
             if existing:
                 existing.x = x
                 existing.y = y
-                db.session.commit()
-                pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
-                sse_manager.broadcast('pins_update', {'pins': pins})
-                return jsonify({'pin': {'id': existing.id, 'player_name': existing.player_name, 'npc_name': existing.npc_name, 'x': existing.x, 'y': existing.y}})
+                db.commit()
+                pins = _serialize_pins(db)
+                _broadcast('pins_update', {'pins': pins})
+                return {
+                    'pin': {
+                        'id': existing.id,
+                        'player_name': existing.player_name,
+                        'npc_name': existing.npc_name,
+                        'x': existing.x,
+                        'y': existing.y,
+                    }
+                }
 
-        # Novo pin
         pin = Pin(player_id=player.id, player_name=player.name, npc_name=npc_name, x=x, y=y)
-        db.session.add(pin)
+        db.add(pin)
     else:
-        # Jogador comum: 1 pin por jogador
-        Pin.query.filter_by(player_id=player.id).delete()
+        db.query(Pin).filter(Pin.player_id == player.id).delete()
         pin = Pin(player_id=player.id, player_name=player.name, npc_name=None, x=x, y=y)
-        db.session.add(pin)
+        db.add(pin)
 
-    db.session.commit()
+    db.commit()
+    pins = _serialize_pins(db)
+    _broadcast('pins_update', {'pins': pins})
 
-    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
-    sse_manager.broadcast('pins_update', {'pins': pins})
-
-    return jsonify({'pin': {'id': pin.id, 'player_name': pin.player_name, 'npc_name': pin.npc_name, 'x': pin.x, 'y': pin.y}})
-
-
-@bp.route('/pins', methods=['GET'])
-def get_pins():
-    """Retorna todos os pins ativos."""
-    pins = Pin.query.all()
-    return jsonify({
-        'pins': [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in pins]
-    })
+    return {
+        'pin': {
+            'id': pin.id,
+            'player_name': pin.player_name,
+            'npc_name': pin.npc_name,
+            'x': pin.x,
+            'y': pin.y,
+        }
+    }
 
 
-@bp.route('/pins/<int:pin_id>', methods=['DELETE'])
-@require_player
-def remove_pin_by_id(player, pin_id):
-    """Remove um PIN específico pelo ID. Só o Mestre ou o dono pode remover."""
-    pin = Pin.query.get(pin_id)
+@router.get('/pins')
+def get_pins(db: Session = Depends(get_db)):
+    return {'pins': _serialize_pins(db)}
+
+
+@router.delete('/pins/{pin_id}')
+def remove_pin_by_id(
+    pin_id: int,
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
+    pin = db.query(Pin).filter(Pin.id == pin_id).first()
     if not pin:
-        return jsonify({'erro': 'Pin não encontrado'}), 404
+        raise HTTPException(status_code=404, detail='Pin não encontrado')
 
     if player.name != 'Mestre' and pin.player_id != player.id:
-        return jsonify({'erro': 'Você não pode remover o pin de outro jogador'}), 403
+        raise HTTPException(status_code=403, detail='Você não pode remover o pin de outro jogador')
 
-    db.session.delete(pin)
-    db.session.commit()
+    db.delete(pin)
+    db.commit()
 
-    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
-    sse_manager.broadcast('pins_update', {'pins': pins})
+    pins = _serialize_pins(db)
+    _broadcast('pins_update', {'pins': pins})
 
-    return jsonify({'sucesso': True})
+    return {'sucesso': True}
 
 
-@bp.route('/pins', methods=['DELETE'])
-@require_player
-def remove_own_pin(player):
-    """Remove o(s) PIN(s) do próprio jogador (jogador comum remove o seu único)."""
+@router.delete('/pins')
+def remove_own_pin(
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
     if player.name == 'Mestre':
-        return jsonify({'erro': 'Mestre deve remover pins individualmente pelo nome'}), 400
+        raise HTTPException(status_code=400, detail='Mestre deve remover pins individualmente pelo nome')
 
-    Pin.query.filter_by(player_id=player.id).delete()
-    db.session.commit()
+    db.query(Pin).filter(Pin.player_id == player.id).delete()
+    db.commit()
 
-    pins = [{'id': p.id, 'player_name': p.player_name, 'npc_name': p.npc_name, 'x': p.x, 'y': p.y} for p in Pin.query.all()]
-    sse_manager.broadcast('pins_update', {'pins': pins})
+    pins = _serialize_pins(db)
+    _broadcast('pins_update', {'pins': pins})
 
-    return jsonify({'sucesso': True})
+    return {'sucesso': True}
 
 
-@bp.route('/map-image', methods=['POST'])
-@require_player
-def set_map_image(player):
-    """Só o Mestre pode carregar imagem do mapa."""
+@router.post('/map-image')
+def set_map_image(
+    body: MapImageBody,
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
     if player.name != 'Mestre':
-        return jsonify({'erro': 'Apenas o Mestre pode carregar a imagem do mapa'}), 403
+        raise HTTPException(status_code=403, detail='Apenas o Mestre pode carregar a imagem do mapa')
 
-    data = request.get_json()
-    if not data or 'data_url' not in data:
-        return jsonify({'erro': 'Envie data_url'}), 400
+    db.query(MapImage).delete()
+    img = MapImage(data_url=body.data_url, width=body.width, height=body.height)
+    db.add(img)
+    db.commit()
 
-    # Substitui a imagem existente
-    MapImage.query.delete()
-    img = MapImage(
-        data_url=data['data_url'],
-        width=int(data.get('width', 0)),
-        height=int(data.get('height', 0)),
-    )
-    db.session.add(img)
-    db.session.commit()
-
-    sse_manager.broadcast('map_image_update', {
+    _broadcast('map_image_update', {
         'data_url': img.data_url,
         'width': img.width,
         'height': img.height,
     })
 
-    return jsonify({'sucesso': True})
+    return {'sucesso': True}
 
 
-@bp.route('/map-image', methods=['GET'])
-def get_map_image():
-    """Retorna a imagem do mapa atual."""
-    img = MapImage.query.first()
+@router.get('/map-image')
+def get_map_image(db: Session = Depends(get_db)):
+    img = db.query(MapImage).first()
     if not img:
-        return jsonify({'data_url': None})
-    return jsonify({
+        return {'data_url': None}
+    return {
         'data_url': img.data_url,
         'width': img.width,
         'height': img.height,
-    })
+    }

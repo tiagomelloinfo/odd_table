@@ -1,19 +1,26 @@
-from functools import wraps
-from flask import request, jsonify
+from fastapi import Header, HTTPException, Depends
+from sqlalchemy.orm import Session
+
+from database import get_db
 from models import Player
 
 
-def require_player(f):
-    """Decorator que extrai o jogador pelo header X-API-Key."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        api_key = request.headers.get('X-API-Key')
-        if not api_key:
-            return jsonify({'erro': 'Token de autenticação ausente. Envie X-API-Key.'}), 401
+async def require_player(
+    x_api_key: str = Header(None, alias='X-API-Key'),
+    db: Session = Depends(get_db),
+) -> Player:
+    """Dependência FastAPI — extrai o jogador pelo header X-API-Key."""
+    if not x_api_key:
+        raise HTTPException(
+            status_code=401,
+            detail='Token de autenticação ausente. Envie X-API-Key.',
+        )
 
-        player = Player.query.filter_by(api_key=api_key).first()
-        if not player:
-            return jsonify({'erro': 'Token inválido. Faça login novamente.'}), 401
+    player = db.query(Player).filter(Player.api_key == x_api_key).first()
+    if not player:
+        raise HTTPException(
+            status_code=401,
+            detail='Token inválido. Faça login novamente.',
+        )
 
-        return f(player=player, *args, **kwargs)
-    return decorated
+    return player
