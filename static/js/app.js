@@ -287,15 +287,17 @@ function connectSSE() {
 function startPolling() {
     if (pollingInterval) return;
     let lastMaxId = 0;
+    let lastPinsHash = '';
+
     pollingInterval = setInterval(async () => {
         try {
+            // Poll de rolls
             const res = await fetch('/api/rolls', {
                 headers: { 'X-API-Key': playerApiKey },
             });
             const data = await res.json();
             const rollList = document.getElementById('roll-list');
 
-            // Mostra toast pros rolls novos (maiores que lastMaxId)
             if (lastMaxId > 0 && data.rolls.length > 0) {
                 const newest = data.rolls[0];
                 if (newest.id > lastMaxId) {
@@ -307,9 +309,20 @@ function startPolling() {
             }
 
             rollList.innerHTML = '';
-            // A API já retorna do mais recente pro mais antigo (ORDER BY desc)
             data.rolls.forEach(addRollToHistory);
             updateOnlineList(data.online);
+
+            // Poll de pins (só se tiver mapa carregado)
+            const canvas = document.getElementById('grid-canvas');
+            if (canvas._hasMapImage) {
+                const pinsRes = await fetch('/api/pins');
+                const pinsData = await pinsRes.json();
+                const currentHash = JSON.stringify(pinsData.pins);
+                if (currentHash !== lastPinsHash) {
+                    lastPinsHash = currentHash;
+                    drawPins(pinsData.pins);
+                }
+            }
         } catch (err) {
             // ignora erro de polling
         }
