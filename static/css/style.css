@@ -325,6 +325,18 @@ main {
     border: none;
 }
 
+.grid-hint {
+    font-size: 0.75rem;
+    color: #9a8a7a;
+    font-style: italic;
+}
+
+.grid-status {
+    font-size: 0.8rem;
+    color: #7a6a5a;
+    font-weight: 600;
+}
+
 .grid-header input[type="file"] {
     display: none;
 }

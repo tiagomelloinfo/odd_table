@@ -443,6 +443,9 @@ function initGrid() {
         const file = e.target.files[0];
         if (!file) return;
 
+        const statusEl = document.getElementById('grid-status');
+        statusEl.textContent = 'Carregando novo mapa';
+
         const reader = new FileReader();
         reader.onload = async (ev) => {
             const dataUrl = ev.target.result;
@@ -454,10 +457,18 @@ function initGrid() {
                 });
                 if (!res.ok) {
                     alert('Apenas o Mestre pode carregar imagens!');
+                    statusEl.textContent = '';
                     return;
                 }
+                if (window.renderMapImage) {
+                    window.renderMapImage(dataUrl);
+                }
+                statusEl.textContent = 'Imagem carregada!';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
             } catch (err) {
                 console.error('Erro ao enviar imagem:', err);
+                statusEl.textContent = 'Erro ao carregar mapa';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
             }
         };
         reader.readAsDataURL(file);
