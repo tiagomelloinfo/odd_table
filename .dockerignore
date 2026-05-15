@@ -1,0 +1,16 @@
+notas.txt
+print.jpg
+print.png
+print_small.jpg
+.gitignore
+.git/
+.github/
+dev.sh
+prod.sh
+.env*
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.alianca/
+.alianca-code/

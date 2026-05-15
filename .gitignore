@@ -11,3 +11,7 @@ instance/
 .env.dev
 dist/
 node_modules/
+notas.txt
+print.jpg
+print.png
+print_small.jpg
