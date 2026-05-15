@@ -8,3 +8,6 @@ instance/
 *.db-shm
 *.db-wal
 .DS_Store
+.env.dev
+dist/
+node_modules/
