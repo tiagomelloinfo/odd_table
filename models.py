@@ -13,6 +13,7 @@ class Player(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False, index=True)
     api_key = Column(String(64), unique=True, nullable=False, default=lambda: uuid.uuid4().hex)
+    color = Column(String(7), nullable=False, default='#e94560')
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow)
 

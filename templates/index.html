@@ -23,6 +23,9 @@
             <h1>🎲 Dice Roller</h1>
             <div class="header-right">
                 <span id="player-name-display"></span>
+                <label class="color-picker-label" title="Alterar cor do seu alfinete">
+                    <input type="color" id="player-color-input" value="#e94560">
+                </label>
                 <span id="online-count">👥 0 online</span>
                 <button id="btn-logout">Sair</button>
             </div>
@@ -32,6 +35,19 @@
             <aside id="sidebar">
                 <h3>Jogadores Online</h3>
                 <ul id="online-list"></ul>
+                <hr>
+                <h3>Iniciativa</h3>
+                <div id="initiative-area">
+                    <div class="initiative-roll">
+                        <input type="number" id="init-modifier" value="0" min="-10" max="20" step="1">
+                        <button id="btn-roll-init">Rolar</button>
+                    </div>
+                    <div class="initiative-npc" id="init-npc-area">
+                        <input type="text" id="init-npc-name" placeholder="Nome (opcional)" maxlength="30">
+                    </div>
+                    <ul id="initiative-list"></ul>
+                    <button id="btn-clear-init" class="master-only" style="display:none;">Limpar tudo</button>
+                </div>
             </aside>
 
             <div id="center-area">

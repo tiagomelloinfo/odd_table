@@ -1,5 +1,6 @@
 let playerName = '';
 let playerApiKey = '';
+let playerColor = '#e94560';
 let sseConnected = false;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -54,10 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             playerName = data.player.name;
             playerApiKey = data.player.api_key;
+            playerColor = data.player.color || '#e94560';
 
-            // Salva no localStorage — persiste mesmo fechando navegador
+            // Salva no localStorage
             localStorage.setItem('dice_roller_api_key', playerApiKey);
             localStorage.setItem('dice_roller_player_name', playerName);
+            localStorage.setItem('dice_roller_player_color', playerColor);
 
             loginScreen.style.display = 'none';
             gameScreen.style.display = 'flex';
@@ -85,6 +88,7 @@ async function validateToken(key, name) {
         if (res.ok) {
             playerApiKey = key;
             playerName = name;
+            playerColor = localStorage.getItem('dice_roller_player_color') || '#e94560';
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('game-screen').style.display = 'flex';
             initGame();
@@ -126,8 +130,42 @@ function initGame() {
     // Mostra o nome do jogador no header
     document.getElementById('player-name-display').textContent = playerName;
 
+    // Cor do jogador
+    const colorInput = document.getElementById('player-color-input');
+    colorInput.value = playerColor;
+    colorInput.addEventListener('change', async (e) => {
+        const newColor = e.target.value;
+        try {
+            const res = await fetch('/api/players/color', {
+                method: 'POST',
+                headers: apiHeaders(),
+                body: JSON.stringify({ color: newColor }),
+            });
+            if (res.ok) {
+                playerColor = newColor;
+                localStorage.setItem('dice_roller_player_color', newColor);
+            }
+        } catch (err) {
+            console.error('Erro ao salvar cor:', err);
+        }
+    });
+
     // Botão sair
     document.getElementById('btn-logout').addEventListener('click', logout);
+
+    // Iniciativa
+    if (playerName === 'Mestre') {
+        document.getElementById('btn-clear-init').style.display = 'block';
+    }
+    document.getElementById('btn-roll-init').addEventListener('click', rollInitiative);
+    document.getElementById('init-modifier').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') rollInitiative();
+    });
+    document.getElementById('init-npc-name').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') rollInitiative();
+    });
+    document.getElementById('btn-clear-init').addEventListener('click', clearInitiative);
+    loadInitiative();
 }
 
 async function loadHistory() {
@@ -270,7 +308,8 @@ function updateOnlineList(players) {
     list.innerHTML = '';
     players.forEach((p) => {
         const li = document.createElement('li');
-        li.textContent = p.name;
+        const color = p.color || '#e94560';
+        li.innerHTML = `<span class="online-dot" style="background:${color}"></span> ${escapeHtml(p.name)}`;
         list.appendChild(li);
     });
     count.textContent = `👥 ${players.length} online`;
@@ -312,6 +351,13 @@ function startPolling() {
             data.rolls.forEach(addRollToHistory);
             updateOnlineList(data.online);
 
+            // Poll de iniciativa
+            try {
+                const initRes = await fetch('/api/initiative');
+                const initData = await initRes.json();
+                updateInitiativeList(initData.initiative);
+            } catch (_) {}
+
             // Poll de pins (só se tiver mapa carregado)
             const canvas = document.getElementById('grid-canvas');
             if (canvas._hasMapImage) {
@@ -345,6 +391,84 @@ function startPing() {
         }
     }, 30000);
 }
+
+// Iniciativa
+async function rollInitiative() {
+    const modifier = parseInt(document.getElementById('init-modifier').value) || 0;
+    const nameInput = document.getElementById('init-npc-name');
+    const customName = nameInput.value.trim();
+    const btn = document.getElementById('btn-roll-init');
+    btn.disabled = true;
+    try {
+        const body = { modifier };
+        if (customName) {
+            body.npc_name = customName;
+            nameInput.value = '';
+        }
+        await fetch('/api/initiative', {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify(body),
+        });
+    } catch (err) {
+        console.error('Erro ao rolar iniciativa:', err);
+    }
+    btn.disabled = false;
+    nameInput.focus();
+}
+
+async function loadInitiative() {
+    try {
+        const res = await fetch('/api/initiative');
+        const data = await res.json();
+        updateInitiativeList(data.initiative);
+    } catch (err) {
+        console.error('Erro ao carregar iniciativa:', err);
+    }
+}
+
+async function clearInitiative() {
+    if (!confirm('Limpar todas as iniciativas?')) return;
+    try {
+        await fetch('/api/initiative/clear', {
+            method: 'POST',
+            headers: apiHeaders(),
+        });
+    } catch (err) {
+        console.error('Erro ao limpar iniciativa:', err);
+    }
+}
+
+async function removeInitiative(name) {
+    try {
+        await fetch('/api/initiative/remove', {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({ name }),
+        });
+    } catch (err) {
+        console.error('Erro ao remover iniciativa:', err);
+    }
+}
+
+function updateInitiativeList(initiative) {
+    const list = document.getElementById('initiative-list');
+    const isMaster = playerName === 'Mestre';
+    if (!initiative || Object.keys(initiative).length === 0) {
+        list.innerHTML = '<li style="color:#9a8a7a;font-style:italic;font-size:0.8rem">Nenhum valor</li>';
+        return;
+    }
+    // Ordena do maior para o menor
+    const sorted = Object.entries(initiative).sort((a, b) => b[1] - a[1]);
+    list.innerHTML = sorted.map(([name, value]) => `
+        <li>
+            <span class="initiative-name">${escapeHtml(name)}</span>
+            <span class="initiative-value">${value}</span>
+            ${isMaster ? `<button class="initiative-remove" onclick="removeInitiative('${escapeHtml(name).replace(/'/g, "\\'")}')">✕</button>` : ''}
+        </li>
+    `).join('');
+}
+
 function initGrid() {
     const canvas = document.getElementById('grid-canvas');
     const ctx = canvas.getContext('2d');
@@ -582,20 +706,11 @@ function drawPins(pins) {
     // Salva pins pro clique direito
     canvas._pinsData = pins;
 
-    // Cores por jogador
-    const colors = ['#e94560', '#4ecdc4', '#f9ca24', '#6c5ce7', '#fd79a8', '#00b894', '#e17055', '#0984e3'];
-    let colorIndex = 0;
-    const playerColors = {};
-
     pins.forEach((pin) => {
         const px = pin.x;
         const py = pin.y;
 
-        if (!playerColors[pin.player_name]) {
-            playerColors[pin.player_name] = colors[colorIndex % colors.length];
-            colorIndex++;
-        }
-        const color = playerColors[pin.player_name];
+        const color = pin.color || '#e94560';
         const label = pin.npc_name || pin.player_name;
 
         // Círculo

@@ -143,6 +143,25 @@ header h1 {
     font-size: 0.95rem;
 }
 
+.color-picker-label input[type="color"] {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #c8b898;
+    border-radius: 50%;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+}
+
+.color-picker-label input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker-label input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 50%;
+}
+
 #online-count {
     font-size: 0.9rem;
     color: #7a6a5a;
@@ -217,9 +236,156 @@ main {
     font-size: 0.95rem;
 }
 
-#online-list li::before {
-    content: '🟢';
-    font-size: 0.7rem;
+.online-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+#sidebar hr {
+    border: none;
+    border-top: 1px solid #d0c0a8;
+    margin: 12px 0;
+}
+
+#initiative-area h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #d0c0a8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #7a6a5a;
+}
+
+.initiative-roll {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.initiative-roll input {
+    width: 50px;
+    padding: 4px 6px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #faf6ee;
+    color: #3a2a1a;
+    font-size: 0.85rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    text-align: center;
+    outline: none;
+}
+
+.initiative-roll button {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid #b09070;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #b89070 0%, #a08060 100%);
+    color: #fff;
+    font-size: 0.75rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.initiative-roll button:hover {
+    background: linear-gradient(180deg, #c8a080 0%, #b09070 100%);
+}
+
+.initiative-npc {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.initiative-npc input {
+    flex: 1;
+    padding: 4px 6px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #faf6ee;
+    color: #3a2a1a;
+    font-size: 0.8rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    outline: none;
+}
+
+.initiative-npc button {
+    padding: 4px 10px;
+    border: 1px solid #6c5ce7;
+    border-radius: 4px;
+    background: linear-gradient(180deg, #7c6cf7 0%, #6c5ce7 100%);
+    color: #fff;
+    font-size: 0.75rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.initiative-npc button:hover {
+    background: linear-gradient(180deg, #8c7cff 0%, #7c6cf7 100%);
+}
+
+#initiative-list {
+    list-style: none;
+    margin-bottom: 6px;
+}
+
+#initiative-list li {
+    padding: 3px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #ede5d6;
+}
+
+.initiative-remove {
+    background: none;
+    border: none;
+    color: #c0392b;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    padding: 0 4px;
+    line-height: 1;
+    opacity: 0.5;
+}
+
+.initiative-remove:hover {
+    opacity: 1;
+}
+
+.initiative-name {
+    font-weight: 600;
+    color: #3a2a1a;
+}
+
+.initiative-value {
+    font-weight: 700;
+    color: #8a6030;
+    font-size: 1rem;
+}
+
+#btn-clear-init {
+    width: 100%;
+    padding: 4px 8px;
+    border: 1px solid #c8b898;
+    border-radius: 4px;
+    background: #e8dcc8;
+    color: #7a6a5a;
+    font-size: 0.75rem;
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    cursor: pointer;
+}
+
+#btn-clear-init:hover {
+    background: #dcccb4;
 }
 
 .dice-buttons {

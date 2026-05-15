@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -34,12 +35,30 @@ def create_or_login(body: PlayerCreate, db: Session = Depends(get_db)):
             'id': player.id,
             'name': player.name,
             'api_key': player.api_key,
+            'color': player.color,
         }
     }
 
 
 class PlayerLogin(BaseModel):
     name: str
+
+
+class PlayerColorBody(BaseModel):
+    color: str
+
+
+@router.post('/players/color')
+def set_player_color(
+    body: PlayerColorBody,
+    player: Player = Depends(require_player),
+    db: Session = Depends(get_db),
+):
+    if not re.match(r'^#[0-9a-fA-F]{6}$', body.color):
+        raise HTTPException(status_code=400, detail='Cor inválida. Use formato #RRGGBB')
+    player.color = body.color
+    db.commit()
+    return {'color': player.color}
 
 
 @router.post('/players/login')

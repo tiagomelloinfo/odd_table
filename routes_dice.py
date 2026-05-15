@@ -20,6 +20,9 @@ DICE_PATTERN = re.compile(r'^(\d+)?d(\d+)([+-]\d+)?$')
 # SSE: fila global de eventos
 _sse_queues: list[asyncio.Queue] = []
 
+# Iniciativa: guarda os valores por jogador
+_initiative: dict[str, int] = {}
+
 
 def _broadcast(event: str, data: dict):
     """Envia evento SSE para todos os clientes conectados."""
@@ -56,7 +59,7 @@ def get_online_players(db: Session):
     """Retorna lista de jogadores que deram ping nos últimos 60 segundos."""
     threshold = datetime.utcnow() - timedelta(seconds=60)
     players = db.query(Player).filter(Player.last_seen >= threshold).all()
-    return [{'id': p.id, 'name': p.name} for p in players]
+    return [{'id': p.id, 'name': p.name, 'color': p.color} for p in players]
 
 
 class RollBody(BaseModel):
@@ -179,6 +182,58 @@ def ping(
     return {'online': online}  # ← mudado: retorna dict, não Response
 
 
+class InitiativeBody(BaseModel):
+    modifier: int = 0
+    npc_name: str | None = None
+
+
+class InitiativeRemoveBody(BaseModel):
+    name: str
+
+
+@router.post('/initiative')
+def roll_initiative(
+    body: InitiativeBody,
+    player: Player | None = Depends(require_player),
+):
+    roll = random.randint(1, 20)
+    total = roll + body.modifier
+    name = body.npc_name or player.name
+    _initiative[name] = total
+
+    _broadcast('initiative_update', {'initiative': dict(_initiative)})
+
+    return {'name': name, 'roll': roll, 'modifier': body.modifier, 'total': total}
+
+
+@router.post('/initiative/remove')
+def remove_initiative(
+    body: InitiativeRemoveBody,
+    player: Player = Depends(require_player),
+):
+    if player.name != 'Mestre':
+        raise HTTPException(status_code=403, detail='Apenas o Mestre pode remover iniciativas')
+    _initiative.pop(body.name, None)
+    _broadcast('initiative_update', {'initiative': dict(_initiative)})
+    return {'sucesso': True}
+
+
+@router.get('/initiative')
+def get_initiative():
+    return {'initiative': dict(_initiative)}
+
+
+@router.post('/initiative/clear')
+def clear_initiative(
+    player: Player = Depends(require_player),
+):
+    if player.name != 'Mestre':
+        raise HTTPException(status_code=403, detail='Apenas o Mestre pode limpar a iniciativa')
+    _initiative.clear()
+    _broadcast('initiative_update', {'initiative': {}})
+    return {'sucesso': True}
+
+
 class PinBody(BaseModel):
     x: float
     y: float
@@ -198,6 +253,7 @@ def _serialize_pins(db: Session):
         'npc_name': p.npc_name,
         'x': p.x,
         'y': p.y,
+        'color': db.query(Player.color).filter(Player.name == p.player_name).scalar() or '#e94560',
     } for p in db.query(Pin).all()]
 
 
