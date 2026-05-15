@@ -1,0 +1,4 @@
+# Alterações:
+
+1 - O grid de mapa ficou muito no "bottom" da pagina, deixe ele logo depois do rolamento de dados.
+   ✓ Corrigido: removido `flex: 1` duplicado do `#dice-area`. Aumentado `min-height` do `#grid-container` para 300px e do `#grid-canvas` para 280px.
