@@ -1,30 +1,27 @@
-from flask import Flask, render_template
-from database import db
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from database import engine, Base
+from routes_auth import router as auth_router
+from routes_dice import router as dice_router
+
+app = FastAPI(title='Odd Table')
+
+# Create tables
+Base.metadata.create_all(bind=engine)
+
+# Templates
+templates = Jinja2Templates(directory='templates')
+
+# Static files
+app.mount('/static', StaticFiles(directory='static'), name='static')
+
+# Routers
+app.include_router(auth_router)
+app.include_router(dice_router)
 
 
-def create_app():
-    app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///dice_roller.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-    db.init_app(app)
-
-    with app.app_context():
-        from models import Player, DiceRoll, Pin, MapImage  # noqa
-        db.create_all()
-
-    from routes_auth import bp as auth_bp
-    from routes_dice import bp as dice_bp
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(dice_bp)
-
-    @app.route('/')
-    def index():
-        return render_template('index.html')
-
-    return app
-
-
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+@app.get('/', response_class=HTMLResponse)
+def index(request: Request):
+    return templates.TemplateResponse('index.html', {'request': request})

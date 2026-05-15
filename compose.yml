@@ -1,0 +1,50 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_PATH=/data/dice_roller.db
+    volumes:
+      - odd-table-data:/data
+    networks:
+      - odd-table-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - odd-table-net
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://caddy:8080
+    networks:
+      - odd-table-net
+    depends_on:
+      - caddy
+    restart: unless-stopped
+
+networks:
+  odd-table-net:
+
+volumes:
+  odd-table-data:
+  caddy-data:
+  caddy-config:

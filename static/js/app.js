@@ -488,6 +488,10 @@ function initGrid() {
             canvas.style.width = w + 'px';
             canvas.style.height = h + 'px';
 
+            // Ajusta o container pro tamanho da imagem
+            const container = document.getElementById('grid-container');
+            container.style.height = h + 'px';
+
             // Fundo preto
             ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, w, h);

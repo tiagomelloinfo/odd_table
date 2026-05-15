@@ -1,0 +1,14 @@
+:8080 {
+  # Headers para SSE
+  header {
+    Cache-Control "no-cache"
+    X-Accel-Buffering "no"
+  }
+
+  # Tudo vai pro Flask — ele serve HTML, API, e assets estáticos
+  reverse_proxy backend:5000 {
+    transport http {
+      response_header_timeout 24h
+    }
+  }
+}
